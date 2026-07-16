@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timebox Planner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #222;
+    --line: #bbb;
+    --line-dark: #444;
+    --header-bg: #3d3d3d;
+    --grid: #e3e3e3;
+    --paper: #fff;
+  }
+
+  body {
+    font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+    background: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+    color: var(--ink);
+  }
+
+  .page {
+    background: var(--paper);
+    width: 760px;
+    padding: 32px 36px 40px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.12);
+  }
+
+  .hidden { display: none !important; }
+
+  /* ── 공통 버튼 ─────────────────────── */
+  .nav-btn {
+    border: 1.5px solid var(--ink);
+    background: #fff;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .nav-btn:hover { background: var(--ink); color: #fff; }
+
+  .text-btn {
+    border: 1.5px solid var(--ink);
+    background: #fff;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .text-btn:hover { background: var(--ink); color: #fff; }
+
+  /* ══════════ 달력 화면 ══════════ */
+  .cal-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .cal-title {
+    font-family: "Arial Black", "Segoe UI", sans-serif;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 1px;
+  }
+
+  .cal-nav { display: flex; align-items: center; gap: 14px; }
+
+  .cal-month {
+    font-size: 20px;
+    font-weight: 700;
+    min-width: 130px;
+    text-align: center;
+  }
+
+  .cal-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1.5px solid var(--ink);
+    table-layout: fixed;
+  }
+
+  .cal-table th {
+    background: var(--header-bg);
+    color: #fff;
+    font-size: 13px;
+    padding: 8px 0;
+  }
+  .cal-table th.sun { color: #ff9d9d; }
+  .cal-table th.sat { color: #9dc3ff; }
+
+  .cal-table td {
+    border: 1px solid var(--line);
+    height: 96px;
+    vertical-align: top;
+    padding: 4px;
+    cursor: pointer;
+  }
+  .cal-table td:hover { background: #f7f7f7; }
+
+  .cal-day-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px; height: 24px;
+    padding: 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .cal-day-num:hover { background: var(--ink); color: #fff; }
+  .cal-day-num.sun { color: #e05d5d; }
+  .cal-day-num.today { background: var(--ink); color: #fff; }
+
+  .cal-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #e05d5d;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+
+  .cal-memo {
+    width: 100%;
+    height: 58px;
+    border: none;
+    resize: none;
+    outline: none;
+    font-size: 11px;
+    line-height: 1.4;
+    margin-top: 3px;
+    background: transparent;
+    font-family: inherit;
+    color: #444;
+    cursor: text;
+  }
+  .cal-memo:focus { background: #f7f7f7; }
+
+  td.other-month { background: #fafafa; }
+  td.other-month .cal-day-num { color: #ccc; }
+
+  .cal-hint {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #999;
+    text-align: right;
+  }
+
+  /* ══════════ D (데일리 플래너) 화면 ══════════ */
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-family: "Arial Black", "Segoe UI", sans-serif;
+    font-size: 34px;
+    letter-spacing: 1px;
+    font-weight: 900;
+  }
+
+  .date-box { text-align: left; min-width: 210px; position: relative; cursor: pointer; }
+
+  /* ── D화면 미니 달력 팝업 ── */
+  #miniCal {
+    position: absolute;
+    top: 100%; right: 0;
+    margin-top: 8px;
+    background: #fff;
+    border: 1.5px solid var(--ink);
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+    padding: 10px;
+    z-index: 100;
+    width: 236px;
+    cursor: default;
+  }
+
+  .mc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .mc-head button {
+    border: 1px solid var(--ink);
+    background: #fff;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .mc-head button:hover { background: var(--ink); color: #fff; }
+
+  .mc-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .mc-dayname { text-align: center; font-size: 11px; color: #888; padding: 2px 0; }
+  .mc-dayname.sun { color: #e05d5d; }
+  .mc-dayname.sat { color: #5d8de0; }
+
+  .mc-day {
+    text-align: center;
+    font-size: 12px;
+    padding: 5px 0;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .mc-day:hover { background: var(--ink); color: #fff; }
+  .mc-day.other { color: #ccc; }
+  .mc-day.sun { color: #e05d5d; }
+  .mc-day.sun.other { color: #f0bcbc; }
+  .mc-day.today { background: var(--ink); color: #fff; }
+  .mc-day.viewing { outline: 2px solid #e05d5d; }
+
+  .date-label {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .date-label .date-value {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .weekdays { display: flex; gap: 5px; }
+
+  .weekdays span {
+    width: 26px; height: 26px;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #555;
+    cursor: pointer;
+  }
+  .weekdays span:hover { background: #ddd; }
+
+  .weekdays span.today {
+    background: var(--ink);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .day-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .day-nav .center { display: flex; gap: 10px; }
+
+  /* ── 서식 도구 (볼드/형광펜) ────────── */
+  .fmt-bar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 14px;
+    padding: 7px 10px;
+    border: 1.5px solid var(--ink);
+    background: #fafafa;
+  }
+
+  .fmt-label { font-size: 11px; color: #888; margin-right: 3px; }
+
+  .fmt-btn {
+    width: 28px; height: 28px;
+    border: 1.5px solid var(--ink);
+    background: #fff;
+    font-weight: 900;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .fmt-btn:hover { background: var(--ink); color: #fff; }
+  .fmt-btn.u { text-decoration: underline; }
+  .fmt-btn.i { font-style: italic; font-family: Georgia, serif; }
+  .fmt-btn.s { text-decoration: line-through; }
+
+  .fmt-sep { width: 1px; height: 20px; background: #ccc; margin: 0 3px; }
+
+  .fmt-hl {
+    width: 24px; height: 24px;
+    border: 1.5px solid #999;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .fmt-hl:hover { border-color: var(--ink); transform: scale(1.15); }
+
+  .fmt-hl.none {
+    background: #fff;
+    position: relative;
+    font-size: 13px;
+    color: #999;
+    line-height: 1;
+  }
+  .fmt-hl.none:hover { color: var(--ink); }
+
+  .fmt-hint { font-size: 11px; color: #999; margin-left: auto; }
+
+  /* ── 데스크톱 앱 전용 바 (불투명도/항상 위) ── */
+  #appBar {
+    position: fixed;
+    top: 8px; right: 8px;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1.5px solid var(--ink);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    opacity: .35;
+    transition: opacity .15s;
+  }
+  #appBar:hover { opacity: 1; }
+  #appBar input[type=range] { width: 90px; accent-color: #3d3d3d; }
+  #appBar label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  #appBar #resetBtn {
+    border: 1px solid #c33;
+    color: #c33;
+    background: #fff;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  #appBar #resetBtn:hover { background: #c33; color: #fff; }
+
+  .body-grid {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .panel { border: 1.5px solid var(--ink); }
+
+  .panel-title {
+    background: var(--header-bg);
+    color: #fff;
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 7px 0;
+    letter-spacing: .5px;
+  }
+
+  /* ── 편집 영역 공통 (contenteditable) ── */
+  .edit { outline: none; }
+  .edit:empty::before {
+    content: attr(data-placeholder);
+    color: #ccc;
+    pointer-events: none;
+  }
+
+  /* ── 체크박스 ── */
+  .chk {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: transparent;
+    background: #fff;
+    user-select: none;
+  }
+  .chk:hover { background: #eee; }
+  .chk.on { background: var(--ink); color: #fff; }
+
+  .priorities { padding: 14px 14px 18px; }
+
+  .priority-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 14px 0 22px;
+  }
+
+  .priority-row .num {
+    width: 24px; height: 24px;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .priority-row .edit {
+    flex: 1;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    padding: 4px 2px;
+    min-height: 24px;
+  }
+  .priority-row .edit:focus { border-bottom-color: var(--ink); }
+  .priority-row.done .edit { text-decoration: line-through; color: #aaa; }
+
+  .brain { margin-top: 24px; }
+
+  .brain .edit {
+    width: 100%;
+    min-height: 430px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 10px 10px;      /* 눈금 10px 단위 */
+    word-break: break-all;
+  }
+
+  /* ── 타임라인 (드래그 타임박스) ────────── */
+  .tl-wrap { border: 1.5px solid var(--ink); }
+
+  .tl-header {
+    background: var(--header-bg);
+    color: #fff;
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 8px 0;
+    letter-spacing: .5px;
+  }
+
+  .timeline { position: relative; }
+
+  .tl-row {
+    position: relative;
+    height: 68px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .tl-row:last-child { border-bottom: none; }
+
+  /* 10분 단위 점선 (30분 지점은 조금 진하게) */
+  .tl-sub {
+    position: absolute;
+    left: 44px; right: 0;
+    border-top: 1px dashed #f0f0f0;
+    pointer-events: none;
+  }
+  .tl-sub.half { border-top-color: #e3e3e3; }
+
+  .tl-hour {
+    position: absolute;
+    left: 0; top: 0;
+    width: 44px; height: 100%;
+    background: #fafafa;
+    border-right: 1px solid #ccc;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    user-select: none;
+  }
+
+  .tl-past {
+    position: absolute;
+    left: 44px; right: 0; top: 0;
+    background: rgba(0,0,0,.045);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .tl-now {
+    position: absolute;
+    left: 44px; right: 0;
+    border-top: 2px solid #e05d5d;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .tl-now::before {
+    content: '';
+    position: absolute;
+    left: -5px; top: -5px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #e05d5d;
+  }
+
+  /* 일정 블록 */
+  .ev {
+    position: absolute;
+    left: 48px; right: 4px;
+    background: #f4f4f4;
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .ev:hover { background: #eee; }
+  .ev.selected { border-color: #e05d5d; box-shadow: 0 0 0 2px rgba(224,93,93,.3); }
+  .ev.done { background: #fafafa; border-color: #999; }
+  .ev.done .ev-text { text-decoration: line-through; color: #aaa; }
+
+  .ev-body {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 20px 0 6px;
+    overflow: hidden;
+  }
+
+  .ev-body .chk { margin-top: 1px; width: 14px; height: 14px; font-size: 10px; }
+
+  .ev-text {
+    flex: 1;
+    font-size: 12px;
+    line-height: 1.3;
+    word-break: break-all;
+    overflow: hidden;
+    min-height: 16px;
+    pointer-events: none;      /* 평소엔 박스 이동, 클릭하면 편집 모드 */
+  }
+  .ev-text.editing { pointer-events: auto; cursor: text; }
+
+  .ev-del {
+    position: absolute;
+    top: 1px; right: 3px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    color: #999;
+    cursor: pointer;
+    display: none;
+    line-height: 1;
+    padding: 2px;
+  }
+  .ev:hover .ev-del { display: block; }
+  .ev-del:hover { color: #e05d5d; }
+
+  .ev-handle {
+    height: 9px;
+    cursor: ns-resize;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ev-handle::before {
+    content: '';
+    width: 26px;
+    border-top: 2px solid #aaa;
+  }
+  .ev-handle:hover::before { border-top-color: var(--ink); }
+
+  .hint {
+    margin-top: 14px;
+    font-size: 11px;
+    color: #999;
+    text-align: right;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body spellcheck="false">
+<div id="appBar" class="hidden">
+  <span>불투명도</span>
+  <input type="range" id="opacityRange" min="30" max="100" value="100" title="창 불투명도 조절">
+  <label title="다른 창 위에 항상 표시"><input type="checkbox" id="pinChk" checked> 항상 위</label>
+  <button id="resetBtn" title="모든 메모/일정 기록을 완전히 삭제">초기화</button>
+</div>
+<div class="page">
+
+  <!-- ══════════ 달력 화면 ══════════ -->
+  <div id="calView">
+    <div class="cal-top">
+      <div class="cal-title">MONTHLY</div>
+      <div class="cal-nav">
+        <button class="nav-btn" id="calPrev">&#8249;</button>
+        <div class="cal-month" id="calMonth"></div>
+        <button class="nav-btn" id="calNext">&#8250;</button>
+        <button class="text-btn" id="calToday">오늘</button>
+      </div>
+    </div>
+    <table class="cal-table">
+      <thead>
+        <tr>
+          <th class="sun">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="sat">토</th>
+        </tr>
+      </thead>
+      <tbody id="calBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ══════════ D (데일리 플래너) 화면 ══════════ -->
+  <div id="dayView" class="hidden">
+    <div class="top">
+      <h1>DAILY PLANNER</h1>
+      <div class="date-box">
+        <div class="date-label">
+          <span>Date</span>
+          <span class="date-value" id="dateValue"></span>
+        </div>
+        <div class="weekdays" id="weekdays" title="클릭하면 달력이 열립니다">
+          <span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span>
+        </div>
+        <div id="miniCal" class="hidden">
+          <div class="mc-head">
+            <button id="mcPrev">&#8249;</button>
+            <span id="mcMonth"></span>
+            <button id="mcNext">&#8250;</button>
+          </div>
+          <div class="mc-grid" id="mcGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-nav">
+      <button class="text-btn" id="backToCal">← 달력</button>
+      <div class="center">
+        <button class="nav-btn" id="dayPrev">&#8249;</button>
+        <button class="text-btn" id="dayToday">오늘</button>
+        <button class="nav-btn" id="dayNext">&#8250;</button>
+      </div>
+      <span style="width:74px"></span>
+    </div>
+
+    <div class="fmt-bar">
+      <span class="fmt-label">서식</span>
+      <button class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)">B</button>
+      <button class="fmt-btn u" data-cmd="underline" title="밑줄 (Ctrl+U)">U</button>
+      <button class="fmt-btn i" data-cmd="italic" title="기울임 (Ctrl+I)">I</button>
+      <button class="fmt-btn s" data-cmd="strikeThrough" title="취소선">S</button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-btn sz" data-size="1" title="글자 작게" style="font-size:10px">가</button>
+      <button class="fmt-btn sz" data-size="3" title="글자 보통" style="font-size:13px">가</button>
+      <button class="fmt-btn sz" data-size="5" title="글자 크게" style="font-size:17px">가</button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-hl" data-color="#fff176" style="background:#fff176" title="형광펜 노랑"></button>
+      <button class="fmt-hl" data-color="#b9f6ca" style="background:#b9f6ca" title="형광펜 초록"></button>
+      <button class="fmt-hl" data-color="#f8bbd0" style="background:#f8bbd0" title="형광펜 분홍"></button>
+      <button class="fmt-hl" data-color="#b3e5fc" style="background:#b3e5fc" title="형광펜 파랑"></button>
+      <button class="fmt-hl" data-color="#ffcc80" style="background:#ffcc80" title="형광펜 주황"></button>
+      <button class="fmt-hl" data-color="#ff8a80" style="background:#ff8a80" title="형광펜 빨강"></button>
+      <button class="fmt-hl none" data-color="" title="형광펜 지우기">&#8709;</button>
+    </div>
+
+    <div class="body-grid">
+      <div class="left">
+        <div class="panel">
+          <div class="panel-title">Top Priorities</div>
+          <div class="priorities">
+            <div class="priority-row" data-done="p1done">
+              <span class="num">1</span>
+              <div class="edit" contenteditable="true" data-key="p1"></div>
+              <span class="chk" data-chk="p1done"></span>
+            </div>
+            <div class="priority-row" data-done="p2done">
+              <span class="num">2</span>
+              <div class="edit" contenteditable="true" data-key="p2"></div>
+              <span class="chk" data-chk="p2done"></span>
+            </div>
+            <div class="priority-row" data-done="p3done" style="margin-bottom:6px">
+              <span class="num">3</span>
+              <div class="edit" contenteditable="true" data-key="p3"></div>
+              <span class="chk" data-chk="p3done"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel brain">
+          <div class="panel-title">Brain Storming</div>
+          <div class="edit" contenteditable="true" data-key="brain"></div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="tl-wrap">
+          <div class="tl-header">TIME BOX</div>
+          <div class="timeline" id="timeline"></div>
+        </div>
+        <div class="hint">
+          빈 곳 클릭 = 일정 생성 · 가운데 드래그 = 이동 · 모서리 드래그 = 크기 (10분 단위)<br>
+          클릭 = 선택 (Del 키로 삭제) · 더블클릭 = 글자 입력 · 자동 저장
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ══════════ 공통 유틸 ══════════
+  const pad = n => String(n).padStart(2, '0');
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const todayKey = () => keyOf(new Date());
+
+  const plannerStore = k => 'timebox_' + k;
+  const memoStore    = k => 'memo_' + k;
+
+  const loadPlanner = k => JSON.parse(localStorage.getItem(plannerStore(k)) || '{}');
+  const hasRecord = k => {
+    const data = loadPlanner(k);
+    const hasText = Object.values(data).some(v => typeof v === 'string' && v.trim());
+    const hasEv = Array.isArray(data.events) &&
+                  data.events.some(e => e && ((e.text || '').trim() || e.d > 30));
+    return hasText || hasEv ||
+           (localStorage.getItem(memoStore(k)) || '').trim() !== '';
+  };
+
+  const calView = document.getElementById('calView');
+  const dayView = document.getElementById('dayView');
+
+  // ══════════ 달력 화면 ══════════
+  let calYear, calMonth;
+
+  function renderCalendar(y, m) {
+    calYear = y; calMonth = m;
+    document.getElementById('calMonth').textContent = `${y}년 ${m + 1}월`;
+
+    const first = new Date(y, m, 1);
+    const startOffset = first.getDay();
+    const start = new Date(y, m, 1 - startOffset);
+
+    const tbody = document.getElementById('calBody');
+    tbody.innerHTML = '';
+    const tKey = todayKey();
+
+    for (let w = 0; w < 6; w++) {
+      const rowFirst = new Date(start);
+      rowFirst.setDate(start.getDate() + w * 7);
+      if (w > 0 && rowFirst.getMonth() !== m && rowFirst.getDate() <= 7) break;
+
+      const tr = document.createElement('tr');
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + w * 7 + i);
+        const k = keyOf(d);
+        const td = document.createElement('td');
+        if (d.getMonth() !== m) td.classList.add('other-month');
+
+        const num = document.createElement('span');
+        num.className = 'cal-day-num';
+        num.textContent = d.getDate();
+        if (d.getDay() === 0) num.classList.add('sun');
+        if (k === tKey) num.classList.add('today');
+        td.appendChild(num);
+
+        td.title = '데일리 플래너 열기';
+        td.addEventListener('click', e => {
+          if (e.target.classList.contains('cal-memo')) return;
+          openDay(k);
+        });
+
+        if (hasRecord(k)) {
+          const dot = document.createElement('span');
+          dot.className = 'cal-dot';
+          td.appendChild(dot);
+        }
+
+        const memo = document.createElement('textarea');
+        memo.className = 'cal-memo';
+        memo.value = localStorage.getItem(memoStore(k)) || '';
+        memo.addEventListener('input', () => {
+          localStorage.setItem(memoStore(k), memo.value);
+        });
+        td.appendChild(memo);
+
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+  }
+
+  document.getElementById('calPrev').addEventListener('click', () => {
+    const m = calMonth - 1;
+    renderCalendar(m < 0 ? calYear - 1 : calYear, (m + 12) % 12);
+  });
+  document.getElementById('calNext').addEventListener('click', () => {
+    const m = calMonth + 1;
+    renderCalendar(m > 11 ? calYear + 1 : calYear, m % 12);
+  });
+  document.getElementById('calToday').addEventListener('click', () => {
+    const t = new Date();
+    renderCalendar(t.getFullYear(), t.getMonth());
+  });
+
+  // ══════════ 서식 (볼드 / 형광펜) ══════════
+  document.execCommand('styleWithCSS', false, true);
+
+  document.querySelectorAll('.fmt-btn').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());   // 선택 유지
+    btn.addEventListener('click', () => {
+      if (btn.dataset.size) document.execCommand('fontSize', false, btn.dataset.size);
+      else document.execCommand(btn.dataset.cmd);
+    });
+  });
+
+  document.querySelectorAll('.fmt-hl').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const c = btn.dataset.color;
+      document.execCommand('hiliteColor', false, c || 'transparent');
+    });
+  });
+
+  // Ctrl+B/U/I → 굵게/밑줄/기울임 (편집 영역에서)
+  const KEY_CMDS = { b: 'bold', u: 'underline', i: 'italic' };
+  document.addEventListener('keydown', e => {
+    const cmd = KEY_CMDS[e.key.toLowerCase()];
+    if (e.ctrlKey && cmd &&
+        document.activeElement && document.activeElement.isContentEditable) {
+      e.preventDefault();
+      document.execCommand(cmd);
+    }
+  });
+
+  // ══════════ D (데일리 플래너) 화면 ══════════
+  const START_HOUR = 6;
+  const END_HOUR = 24;
+  const HOUR_PX = 68;                       // 1시간 = 68px
+  const PX_PER_MIN = HOUR_PX / 60;
+  const SNAP = 10;                          // 드래그 스냅: 10분 단위
+  const START_MIN = START_HOUR * 60;
+  const END_MIN = (END_HOUR + 1) * 60;
+
+  let currentKey = todayKey();
+  let saved = {};
+  let events = [];    // [{s: 시작(분), d: 길이(분), text: html, done: bool}]
+  let selected = null;   // 선택된 일정 (Del 키로 삭제)
+
+  const timeline = document.getElementById('timeline');
+
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    const row = document.createElement('div');
+    row.className = 'tl-row';
+    row.innerHTML = `<div class="tl-hour">${h}</div>`;
+    // 10분 단위 점선 (30분 지점은 진하게)
+    for (let i = 1; i <= 5; i++) {
+      const sub = document.createElement('div');
+      sub.className = 'tl-sub' + (i === 3 ? ' half' : '');
+      sub.style.top = (i / 6 * 100) + '%';
+      row.appendChild(sub);
+    }
+    timeline.appendChild(row);
+  }
+
+  const pastEl = document.createElement('div');
+  pastEl.className = 'tl-past hidden';
+  const nowEl = document.createElement('div');
+  nowEl.className = 'tl-now hidden';
+  timeline.appendChild(pastEl);
+  timeline.appendChild(nowEl);
+
+  const minToPx = min => (min - START_MIN) * PX_PER_MIN;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const cleanHtml = el => el.textContent.trim() === '' && !el.querySelector('span,b') ? '' : el.innerHTML;
+
+  function savePlanner() {
+    saved.events = events;
+    localStorage.setItem(plannerStore(currentKey), JSON.stringify(saved));
+  }
+
+  // ── 일정 블록 렌더링 ──
+  function renderEvents() {
+    timeline.querySelectorAll('.ev').forEach(el => el.remove());
+    events.forEach((ev, idx) => {
+      const el = document.createElement('div');
+      el.className = 'ev' + (ev.done ? ' done' : '') + (ev === selected ? ' selected' : '');
+      el.dataset.idx = idx;
+      el.style.top = minToPx(ev.s) + 'px';
+      el.style.height = (ev.d * PX_PER_MIN) + 'px';
+
+      const body = document.createElement('div');
+      body.className = 'ev-body';
+
+      const chk = document.createElement('span');
+      chk.className = 'chk' + (ev.done ? ' on' : '');
+      chk.textContent = '✓';
+      chk.title = '완료 체크';
+      chk.addEventListener('mousedown', e => e.stopPropagation());
+      chk.addEventListener('click', e => {
+        e.stopPropagation();
+        ev.done = !ev.done;
+        el.classList.toggle('done', ev.done);
+        chk.classList.toggle('on', ev.done);
+        savePlanner();
+      });
+
+      const txt = document.createElement('div');
+      txt.className = 'ev-text edit';
+      txt.contentEditable = 'true';
+      txt.dataset.placeholder = '일정 입력';
+      txt.innerHTML = ev.text || '';
+      txt.addEventListener('input', () => { ev.text = cleanHtml(txt); savePlanner(); });
+      txt.addEventListener('mousedown', e => e.stopPropagation());
+      txt.addEventListener('blur', () => txt.classList.remove('editing'));
+
+      const del = document.createElement('button');
+      del.className = 'ev-del';
+      del.textContent = '×';
+      del.title = '삭제';
+      del.addEventListener('mousedown', e => e.stopPropagation());
+      del.addEventListener('click', e => {
+        e.stopPropagation();
+        events.splice(idx, 1);
+        renderEvents();
+        savePlanner();
+      });
+
+      const handle = document.createElement('div');
+      handle.className = 'ev-handle';
+      handle.title = '드래그하여 시간 조절 (30분 단위)';
+      handle.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        startResize(ev, el, false);
+      });
+
+      body.appendChild(chk);
+      body.appendChild(txt);
+      el.appendChild(body);
+      el.appendChild(del);
+      el.appendChild(handle);
+
+      // 더블클릭 = 바로 글자 편집
+      el.addEventListener('dblclick', e => {
+        if (e.target.closest('.chk, .ev-del, .ev-handle')) return;
+        e.preventDefault();
+        selected = ev;
+        timeline.querySelectorAll('.ev.selected').forEach(x => x.classList.remove('selected'));
+        el.classList.add('selected');
+        beginEdit(el, e);
+      });
+
+      // 커서 안내: 위 모서리 = 크기 조절, 가운데 = 이동
+      el.addEventListener('mousemove', e => {
+        if (drag) return;
+        const r = el.getBoundingClientRect();
+        el.style.cursor = (e.clientY - r.top < 8) ? 'ns-resize' : 'move';
+      });
+
+      // 위 모서리 드래그 = 시작 시간 조절, 가운데 드래그 = 박스 이동, 클릭 = 글자 편집
+      el.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const r = el.getBoundingClientRect();
+        const rect = timeline.getBoundingClientRect();
+        if (e.clientY - r.top < 8) {
+          drag = { ev, el, mode: 'resize-top', endFixed: ev.s + ev.d };
+          document.body.style.cursor = 'ns-resize';
+        } else {
+          drag = { ev, el, mode: 'move',
+                   grabDelta: (e.clientY - rect.top) - minToPx(ev.s),
+                   startClientY: e.clientY, moved: false };
+          document.body.style.cursor = 'move';
+        }
+      });
+
+      timeline.appendChild(el);
+    });
+  }
+
+  // ── 드래그 리사이즈 (30분 단위 스냅) ──
+  let drag = null;
+
+  function startResize(ev, el, created) {
+    drag = { ev, el, created, mode: 'resize-bottom' };
+    document.body.style.cursor = 'ns-resize';
+  }
+
+  // 클릭한 위치에 커서를 놓고 글자 편집 시작
+  function beginEdit(el, e) {
+    const txt = el.querySelector('.ev-text');
+    txt.classList.add('editing');
+    txt.focus();
+    if (e && document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range && txt.contains(range.startContainer)) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  }
+
+  document.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const rect = timeline.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+
+    if (drag.mode === 'resize-bottom') {
+      const endMin = clamp(
+        Math.round((y - minToPx(drag.ev.s)) / PX_PER_MIN / SNAP) * SNAP + drag.ev.s,
+        drag.ev.s + SNAP,
+        END_MIN
+      );
+      const dur = endMin - drag.ev.s;
+      if (dur !== drag.ev.d) {
+        drag.ev.d = dur;
+        drag.el.style.height = (dur * PX_PER_MIN) + 'px';
+      }
+
+    } else if (drag.mode === 'resize-top') {
+      const newS = clamp(
+        Math.round(y / PX_PER_MIN / SNAP) * SNAP + START_MIN,
+        START_MIN,
+        drag.endFixed - SNAP
+      );
+      if (newS !== drag.ev.s) {
+        drag.ev.s = newS;
+        drag.ev.d = drag.endFixed - newS;
+        drag.el.style.top = minToPx(newS) + 'px';
+        drag.el.style.height = (drag.ev.d * PX_PER_MIN) + 'px';
+      }
+
+    } else if (drag.mode === 'move') {
+      if (Math.abs(e.clientY - drag.startClientY) > 3) drag.moved = true;
+      if (!drag.moved) return;
+      const newS = clamp(
+        Math.round((y - drag.grabDelta) / PX_PER_MIN / SNAP) * SNAP + START_MIN,
+        START_MIN,
+        END_MIN - drag.ev.d
+      );
+      if (newS !== drag.ev.s) {
+        drag.ev.s = newS;
+        drag.el.style.top = minToPx(newS) + 'px';
+      }
+    }
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    document.body.style.cursor = '';
+    savePlanner();
+    if (d.created) {
+      selected = d.ev;
+      d.el.classList.add('selected');
+      beginEdit(d.el, e);
+    } else if (d.mode === 'move' && !d.moved) {
+      // 클릭 = 선택 (Del 키로 삭제 가능) — 재렌더링 없이 클래스만 토글 (더블클릭 보존)
+      const wasSelected = selected === d.ev;
+      selected = wasSelected ? null : d.ev;
+      timeline.querySelectorAll('.ev.selected').forEach(x => x.classList.remove('selected'));
+      if (!wasSelected) d.el.classList.add('selected');
+    }
+  });
+
+  // Del/Backspace = 선택된 일정 삭제, Esc = 선택 해제
+  document.addEventListener('keydown', e => {
+    if (dayView.classList.contains('hidden')) return;
+    const a = document.activeElement;
+    const editing = a && (['INPUT', 'TEXTAREA'].includes(a.tagName) || a.isContentEditable);
+    if (e.key === 'Escape') {
+      selected = null;
+      renderEvents();
+      miniCal.classList.add('hidden');
+      if (editing) a.blur();
+      return;
+    }
+    if (editing) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
+      const i = events.indexOf(selected);
+      if (i > -1) events.splice(i, 1);
+      selected = null;
+      renderEvents();
+      savePlanner();
+    }
+  });
+
+  timeline.addEventListener('mousedown', e => {
+    if (e.target.closest('.ev')) return;
+    if (e.button !== 0) return;
+    const rect = timeline.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const s = clamp(Math.floor(y / PX_PER_MIN / SNAP) * SNAP + START_MIN, START_MIN, END_MIN - 30);
+    const ev = { s, d: 30, text: '', done: false };
+    events.push(ev);
+    renderEvents();
+    const el = timeline.querySelector(`.ev[data-idx="${events.length - 1}"]`);
+    startResize(ev, el, true);
+    e.preventDefault();
+  });
+
+  // ── 현재 시각 표시 ──
+  function paintTime() {
+    const isToday = currentKey === todayKey();
+    const cur = new Date();
+    const curMin = cur.getHours() * 60 + cur.getMinutes();
+    if (!isToday || curMin < START_MIN || curMin > END_MIN) {
+      pastEl.classList.add('hidden');
+      nowEl.classList.add('hidden');
+      return;
+    }
+    pastEl.classList.remove('hidden');
+    nowEl.classList.remove('hidden');
+    pastEl.style.height = minToPx(curMin) + 'px';
+    nowEl.style.top = minToPx(curMin) + 'px';
+  }
+
+  // ── 구버전 데이터(t{h}_00 칸) → 일정 블록 변환 ──
+  function migrateOld(data) {
+    const evs = [];
+    Object.keys(data).forEach(key => {
+      const m = key.match(/^t(\d+)_(00|30)$/);
+      if (!m || !(data[key] || '').trim()) return;
+      const s = clamp(+m[1] * 60 + +m[2], START_MIN, END_MIN - 30);
+      evs.push({ s, d: 30, text: data[key], done: false });
+    });
+    return evs.sort((a, b) => a.s - b.s);
+  }
+
+  function openDay(k) {
+    currentKey = k;
+    const [y, m, d] = k.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+
+    document.getElementById('dateValue').textContent = `${y} . ${pad(m)} . ${pad(d)}`;
+
+    // 가운데 버튼: 오늘이면 '오늘', 아니면 보고 있는 날짜 표시 (클릭 시 오늘로 복귀)
+    const todayBtn = document.getElementById('dayToday');
+    todayBtn.textContent = k === todayKey() ? '오늘' : `${m}.${d}`;
+    todayBtn.title = k === todayKey() ? '' : '오늘로 이동';
+
+    const dayIdx = (date.getDay() + 6) % 7;
+    document.querySelectorAll('#weekdays span').forEach((s, i) =>
+      s.classList.toggle('today', i === dayIdx));
+
+    saved = loadPlanner(k);
+    events = Array.isArray(saved.events) ? saved.events : migrateOld(saved);
+    saved.events = events;
+    selected = null;
+
+    document.querySelectorAll('#dayView .edit[data-key]').forEach(el => {
+      el.innerHTML = saved[el.dataset.key] || '';
+    });
+
+    // 체크박스 상태 복원
+    document.querySelectorAll('.priority-row').forEach(row => {
+      const dk = row.dataset.done;
+      const on = !!saved[dk];
+      row.classList.toggle('done', on);
+      row.querySelector('.chk').classList.toggle('on', on);
+    });
+
+    renderEvents();
+    paintTime();
+    calView.classList.add('hidden');
+    dayView.classList.remove('hidden');
+  }
+
+  // 좌측 패널 입력 → 자동 저장
+  document.querySelectorAll('#dayView .edit[data-key]').forEach(el => {
+    el.addEventListener('input', () => {
+      saved[el.dataset.key] = cleanHtml(el);
+      savePlanner();
+    });
+  });
+
+  // 우선순위 체크박스
+  document.querySelectorAll('.priority-row .chk').forEach(chk => {
+    chk.textContent = '✓';
+    chk.addEventListener('click', () => {
+      const row = chk.closest('.priority-row');
+      const dk = chk.dataset.chk;
+      saved[dk] = !saved[dk];
+      row.classList.toggle('done', saved[dk]);
+      chk.classList.toggle('on', saved[dk]);
+      savePlanner();
+    });
+  });
+
+  // ── 미니 달력: 날짜/요일 영역 클릭 → 달력에서 날짜 선택 → 그 날의 D화면 ──
+  const miniCal = document.getElementById('miniCal');
+  let mcY, mcM;
+
+  function renderMiniCal(y, m) {
+    mcY = y; mcM = m;
+    document.getElementById('mcMonth').textContent = `${y}년 ${m + 1}월`;
+    const grid = document.getElementById('mcGrid');
+    grid.innerHTML = '';
+
+    ['일','월','화','수','목','금','토'].forEach((n, i) => {
+      const h = document.createElement('div');
+      h.className = 'mc-dayname' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '');
+      h.textContent = n;
+      grid.appendChild(h);
+    });
+
+    const first = new Date(y, m, 1);
+    const start = new Date(y, m, 1 - first.getDay());
+    const tKey = todayKey();
+
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      if (i % 7 === 0 && i > 0 && d.getMonth() !== m && d.getDate() <= 7) break;
+      const k = keyOf(d);
+      const c = document.createElement('div');
+      c.className = 'mc-day';
+      if (d.getMonth() !== m) c.classList.add('other');
+      if (d.getDay() === 0) c.classList.add('sun');
+      if (k === tKey) c.classList.add('today');
+      if (k === currentKey) c.classList.add('viewing');
+      c.textContent = d.getDate();
+      c.addEventListener('click', e => {
+        e.stopPropagation();
+        miniCal.classList.add('hidden');
+        openDay(k);
+      });
+      grid.appendChild(c);
+    }
+  }
+
+  document.getElementById('mcPrev').addEventListener('click', e => {
+    e.stopPropagation();
+    const m = mcM - 1;
+    renderMiniCal(m < 0 ? mcY - 1 : mcY, (m + 12) % 12);
+  });
+  document.getElementById('mcNext').addEventListener('click', e => {
+    e.stopPropagation();
+    const m = mcM + 1;
+    renderMiniCal(m > 11 ? mcY + 1 : mcY, m % 12);
+  });
+
+  // 날짜/요일 영역 클릭 → 미니 달력 열기/닫기
+  document.querySelector('.date-box').addEventListener('click', e => {
+    if (e.target.closest('#miniCal')) return;
+    if (miniCal.classList.contains('hidden')) {
+      const [y, m] = currentKey.split('-').map(Number);
+      renderMiniCal(y, m - 1);
+      miniCal.classList.remove('hidden');
+    } else {
+      miniCal.classList.add('hidden');
+    }
+  });
+
+  // 바깥 클릭 시 미니 달력 닫기
+  document.addEventListener('mousedown', e => {
+    if (!miniCal.classList.contains('hidden') && !e.target.closest('.date-box')) {
+      miniCal.classList.add('hidden');
+    }
+  });
+
+  function shiftDay(delta) {
+    const [y, m, d] = currentKey.split('-').map(Number);
+    const date = new Date(y, m - 1, d + delta);
+    openDay(keyOf(date));
+  }
+
+  document.getElementById('dayPrev').addEventListener('click', () => shiftDay(-1));
+  document.getElementById('dayNext').addEventListener('click', () => shiftDay(1));
+  document.getElementById('dayToday').addEventListener('click', () => openDay(todayKey()));
+  document.getElementById('backToCal').addEventListener('click', () => {
+    const [y, m] = currentKey.split('-').map(Number);
+    renderCalendar(y, m - 1);
+    dayView.classList.add('hidden');
+    calView.classList.remove('hidden');
+  });
+
+  document.addEventListener('keydown', e => {
+    if (dayView.classList.contains('hidden')) return;
+    const a = document.activeElement;
+    if (a && (['INPUT', 'TEXTAREA'].includes(a.tagName) || a.isContentEditable)) return;
+    if (e.key === 'ArrowLeft') shiftDay(-1);
+    if (e.key === 'ArrowRight') shiftDay(1);
+  });
+
+  setInterval(paintTime, 60 * 1000);
+
+  // 데스크톱 앱에서 실행 중이면 불투명도/항상 위 바 표시
+  if (window.electronAPI) {
+    const bar = document.getElementById('appBar');
+    bar.classList.remove('hidden');
+    const op = document.getElementById('opacityRange');
+    op.addEventListener('input', () => window.electronAPI.setOpacity(op.value / 100));
+    const pin = document.getElementById('pinChk');
+    pin.addEventListener('change', () => window.electronAPI.setPin(pin.checked));
+
+    // 데이터 초기화: 모든 플래너/메모 기록 삭제
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!confirm('모든 메모와 일정 기록을 완전히 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('timebox_') || k.startsWith('memo_'))
+        .forEach(k => localStorage.removeItem(k));
+      location.reload();
+    });
+  }
+
+  // 시작: 이번 달 달력
+  const t = new Date();
+  renderCalendar(t.getFullYear(), t.getMonth());
+</script>
+</body>
+</html>

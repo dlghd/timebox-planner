@@ -1,0 +1,39 @@
+{
+  "name": "timebox-planner",
+  "productName": "Timebox Planner",
+  "version": "1.0.0",
+  "description": "일론 머스크식 타임박스 데일리 플래너",
+  "main": "main.js",
+  "author": "POWERCRAFT",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "kr.co.powercraft.timeboxplanner",
+    "productName": "TimeboxPlanner",
+    "electronVersion": "22.3.27",
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["ia32"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "TimeboxPlanner.exe"
+    }
+  }
+}
