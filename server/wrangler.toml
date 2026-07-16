@@ -1,0 +1,7 @@
+name = "timebox-sync"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "69c09d0551b340b497760adc1ee0bc3d"
