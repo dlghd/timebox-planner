@@ -1561,15 +1561,11 @@
   function authInit() {
     return new Promise(res => {
       resolveAuth = res;
-      const accts = getAccounts();
+      // 로그인 화면이 기본, 회원가입은 '새 계정 만들기' 클릭 시
       const last = localStorage.getItem('tb_lastUser') || '';
-      if (Object.keys(accts).length === 0) {
-        showAuthForm('signup');
-      } else {
-        if (last) document.getElementById('liId').value = last;
-        document.getElementById('rememberChk').checked = !!last;
-        showAuthForm('login');
-      }
+      if (last) document.getElementById('liId').value = last;
+      document.getElementById('rememberChk').checked = !!last;
+      showAuthForm('login');
     });
   }
 
@@ -1607,6 +1603,10 @@
     const pin = document.getElementById('liPin').value;
     if (!id || !/^\d{4}$/.test(pin)) return false;
     const accts = getAccounts();
+    if (Object.keys(accts).length === 0) {
+      authMsg.textContent = '등록된 계정이 없습니다. 아래 "새 계정 만들기"로 가입해주세요.';
+      return false;
+    }
     if (!accts[id] || accts[id].pin !== await hashPin(id, pin)) {
       authMsg.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
       document.getElementById('liPin').value = '';
