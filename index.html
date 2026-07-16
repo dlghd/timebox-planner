@@ -324,6 +324,89 @@
 
   .fmt-hint { font-size: 11px; color: #999; margin-left: auto; }
 
+  /* ── 로그인 / 회원가입 ── */
+  .auth-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 60px 0;
+  }
+
+  .auth-box {
+    width: 320px;
+    border: 1.5px solid var(--ink);
+    padding: 28px 26px;
+    background: #fff;
+  }
+
+  .auth-box h2 {
+    font-family: "Arial Black", "Segoe UI", sans-serif;
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+  }
+
+  .auth-sub {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 20px;
+  }
+
+  .auth-box input[type=text],
+  .auth-box input[type=password] {
+    width: 100%;
+    border: 1px solid var(--line);
+    padding: 9px 10px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    outline: none;
+    font-family: inherit;
+  }
+  .auth-box input:focus { border-color: var(--ink); }
+
+  .auth-box button {
+    width: 100%;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .auth-box button:hover { background: #000; }
+
+  .auth-box label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+
+  .auth-link {
+    display: block;
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    margin-top: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .auth-link:hover { color: var(--ink); }
+
+  #authMsg {
+    min-height: 18px;
+    font-size: 12px;
+    color: #c33;
+    text-align: center;
+    margin-top: 10px;
+  }
+
   /* ── 데스크톱 앱 전용 바 (불투명도/항상 위) ── */
   #appBar {
     position: fixed;
@@ -355,7 +438,7 @@
   }
   #appBar #resetBtn:hover { background: #c33; color: #fff; }
 
-  #appBar #syncBtn {
+  #appBar #syncBtn, #appBar #logoutBtn {
     border: 1px solid var(--ink);
     color: var(--ink);
     background: #fff;
@@ -364,7 +447,7 @@
     font-size: 11px;
     cursor: pointer;
   }
-  #appBar #syncBtn:hover { background: var(--ink); color: #fff; }
+  #appBar #syncBtn:hover, #appBar #logoutBtn:hover { background: var(--ink); color: #fff; }
 
   .body-grid {
     display: grid;
@@ -605,12 +688,41 @@
   <input type="range" id="opacityRange" min="30" max="100" value="100" title="창 불투명도 조절">
   <label title="다른 창 위에 항상 표시"><input type="checkbox" id="pinChk" checked> 항상 위</label>
   <button id="syncBtn" title="클라우드 폴더(OneDrive/구글드라이브 등)를 지정하면 다른 PC와 기록이 공유됩니다">동기화</button>
-  <button id="resetBtn" title="모든 메모/일정 기록을 완전히 삭제">초기화</button>
+  <button id="logoutBtn" title="로그인 화면으로 돌아갑니다">로그아웃</button>
+  <button id="resetBtn" title="현재 계정의 모든 메모/일정 기록을 완전히 삭제">초기화</button>
 </div>
 <div class="page">
 
+  <!-- ══════════ 로그인 / 회원가입 ══════════ -->
+  <div id="authView" class="auth-wrap hidden">
+    <div class="auth-box">
+      <h2>TIMEBOX PLANNER</h2>
+
+      <div id="signupForm" class="hidden">
+        <div class="auth-sub">처음 사용 — 간단한 정보로 가입하세요</div>
+        <input type="text" id="suName" placeholder="이름">
+        <input type="text" id="suId" placeholder="아이디 (영문/숫자)">
+        <input type="password" id="suPin" maxlength="4" inputmode="numeric" placeholder="간편 비밀번호 4자리">
+        <input type="password" id="suPin2" maxlength="4" inputmode="numeric" placeholder="비밀번호 확인">
+        <button id="suBtn">회원가입</button>
+        <span class="auth-link" id="goLogin">이미 계정이 있어요 → 로그인</span>
+      </div>
+
+      <div id="loginForm" class="hidden">
+        <div class="auth-sub">4자리 비밀번호로 빠르게 로그인</div>
+        <input type="text" id="liId" placeholder="아이디">
+        <input type="password" id="liPin" maxlength="4" inputmode="numeric" placeholder="비밀번호 4자리">
+        <label><input type="checkbox" id="rememberChk" checked> 아이디 기억하기</label>
+        <button id="liBtn">로그인</button>
+        <span class="auth-link" id="goSignup">새 계정 만들기</span>
+      </div>
+
+      <div id="authMsg"></div>
+    </div>
+  </div>
+
   <!-- ══════════ 달력 화면 ══════════ -->
-  <div id="calView">
+  <div id="calView" class="hidden">
     <div class="cal-top">
       <div class="cal-title">MONTHLY</div>
       <div class="cal-nav">
@@ -733,8 +845,20 @@
   const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const todayKey = () => keyOf(new Date());
 
-  const plannerStore = k => 'timebox_' + k;
-  const memoStore    = k => 'memo_' + k;
+  // ══════════ 계정 (로컬 회원가입 / 4자리 PIN 로그인) ══════════
+  let curUser = null;
+  const userPrefix = () => `u_${curUser}_`;
+
+  const getAccounts = () => JSON.parse(localStorage.getItem('tb_accounts') || '{}');
+
+  async function hashPin(id, pin) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id + ':' + pin));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  const plannerStore = k => userPrefix() + 'timebox_' + k;
+  const memoStore    = k => userPrefix() + 'memo_' + k;
+  const isDataKey    = k => k.startsWith('u_') || k.startsWith('timebox_') || k.startsWith('memo_');
 
   const loadPlanner = k => JSON.parse(localStorage.getItem(plannerStore(k)) || '{}');
   const hasRecord = k => {
@@ -907,7 +1031,7 @@
   function exportAll() {
     const data = {};
     Object.keys(localStorage).forEach(k => {
-      if (k.startsWith('timebox_') || k.startsWith('memo_')) data[k] = localStorage.getItem(k);
+      if (isDataKey(k)) data[k] = localStorage.getItem(k);
     });
     return data;
   }
@@ -934,10 +1058,10 @@
       const localAt = +(localStorage.getItem('sync_savedAt') || 0);
       if ((res.savedAt || 0) > localAt) {
         Object.keys(localStorage)
-          .filter(k => k.startsWith('timebox_') || k.startsWith('memo_'))
+          .filter(isDataKey)
           .forEach(k => localStorage.removeItem(k));
         Object.entries(res.data || {}).forEach(([k, v]) => {
-          if (k.startsWith('timebox_') || k.startsWith('memo_')) localStorage.setItem(k, v);
+          if (isDataKey(k)) localStorage.setItem(k, v);
         });
         localStorage.setItem('sync_savedAt', String(res.savedAt));
       } else if (localAt > (res.savedAt || 0)) {
@@ -1016,6 +1140,22 @@
         timeline.querySelectorAll('.ev.selected').forEach(x => x.classList.remove('selected'));
         el.classList.add('selected');
         beginEdit(el, e);
+      });
+
+      // 트리플클릭 = 메모 전체 내용을 서브창으로 크게 보기
+      el.addEventListener('click', e => {
+        if (e.detail !== 3) return;
+        if (e.target.closest('.chk, .ev-del, .ev-handle')) return;
+        const fmt = min => `${Math.floor(min / 60)}:${pad(min % 60)}`;
+        const title = `${currentKey}  ${fmt(ev.s)} ~ ${fmt(ev.s + ev.d)}`;
+        if (window.electronAPI && window.electronAPI.openMemo) {
+          window.electronAPI.openMemo({ title, html: ev.text || '(내용 없음)' });
+        } else {
+          const w = window.open('', '_blank', 'width=460,height=420');
+          w.document.write(`<meta charset="utf-8"><title>${title}</title>
+            <body style="font-family:'Malgun Gothic',sans-serif;padding:18px;font-size:14px;line-height:1.7;word-break:break-all">
+            <h3 style="margin-bottom:12px">${title}</h3>${ev.text || '(내용 없음)'}</body>`);
+        }
       });
 
       // 커서 안내: 위 모서리 = 크기 조절, 가운데 = 이동
@@ -1367,11 +1507,17 @@
 
     // 데이터 초기화: 모든 플래너/메모 기록 삭제
     document.getElementById('resetBtn').addEventListener('click', () => {
-      if (!confirm('모든 메모와 일정 기록을 완전히 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
+      if (!confirm('현재 계정의 모든 메모와 일정 기록을 완전히 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
       Object.keys(localStorage)
-        .filter(k => k.startsWith('timebox_') || k.startsWith('memo_'))
+        .filter(k => k.startsWith(userPrefix()))
         .forEach(k => localStorage.removeItem(k));
-      scheduleSync(true);   // 동기화 파일도 비움
+      scheduleSync(true);   // 동기화 파일에도 반영
+      location.reload();
+    });
+
+    // 로그아웃 → 로그인 화면으로
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      scheduleSync(true);
       location.reload();
     });
 
@@ -1387,9 +1533,108 @@
     });
   }
 
-  // 시작: 동기화 데이터 반영 후 이번 달 달력 표시
+  // ══════════ 로그인 / 회원가입 흐름 ══════════
+  const authView = document.getElementById('authView');
+  const authMsg = document.getElementById('authMsg');
+  let resolveAuth = null;
+
+  function showAuthForm(which) {
+    document.getElementById('signupForm').classList.toggle('hidden', which !== 'signup');
+    document.getElementById('loginForm').classList.toggle('hidden', which !== 'login');
+    authMsg.textContent = '';
+    authView.classList.remove('hidden');
+    setTimeout(() => {
+      const el = which === 'signup'
+        ? document.getElementById('suName')
+        : (document.getElementById('liId').value ? document.getElementById('liPin') : document.getElementById('liId'));
+      el.focus();
+    }, 0);
+  }
+
+  function finishLogin(id) {
+    curUser = id;
+    authView.classList.add('hidden');
+    calView.classList.remove('hidden');
+    if (resolveAuth) resolveAuth();
+  }
+
+  function authInit() {
+    return new Promise(res => {
+      resolveAuth = res;
+      const accts = getAccounts();
+      const last = localStorage.getItem('tb_lastUser') || '';
+      if (Object.keys(accts).length === 0) {
+        showAuthForm('signup');
+      } else {
+        if (last) document.getElementById('liId').value = last;
+        document.getElementById('rememberChk').checked = !!last;
+        showAuthForm('login');
+      }
+    });
+  }
+
+  document.getElementById('suBtn').addEventListener('click', async () => {
+    const name = document.getElementById('suName').value.trim();
+    const id = document.getElementById('suId').value.trim();
+    const pin = document.getElementById('suPin').value;
+    const pin2 = document.getElementById('suPin2').value;
+    if (!name || !id) { authMsg.textContent = '이름과 아이디를 입력해주세요.'; return; }
+    if (!/^[A-Za-z0-9_-]+$/.test(id)) { authMsg.textContent = '아이디는 영문/숫자만 가능합니다.'; return; }
+    if (!/^\d{4}$/.test(pin)) { authMsg.textContent = '비밀번호는 숫자 4자리여야 합니다.'; return; }
+    if (pin !== pin2) { authMsg.textContent = '비밀번호 확인이 일치하지 않습니다.'; return; }
+    const accts = getAccounts();
+    if (accts[id]) { authMsg.textContent = '이미 존재하는 아이디입니다.'; return; }
+
+    const isFirst = Object.keys(accts).length === 0;
+    accts[id] = { name, pin: await hashPin(id, pin), createdAt: new Date().toISOString() };
+    localStorage.setItem('tb_accounts', JSON.stringify(accts));
+    localStorage.setItem('tb_lastUser', id);
+
+    // 기존(계정 도입 전) 기록을 첫 계정으로 이전
+    if (isFirst) {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('timebox_') || k.startsWith('memo_'))
+        .forEach(k => {
+          localStorage.setItem(`u_${id}_` + k, localStorage.getItem(k));
+          localStorage.removeItem(k);
+        });
+    }
+    finishLogin(id);
+  });
+
+  async function tryLogin() {
+    const id = document.getElementById('liId').value.trim();
+    const pin = document.getElementById('liPin').value;
+    if (!id || !/^\d{4}$/.test(pin)) return false;
+    const accts = getAccounts();
+    if (!accts[id] || accts[id].pin !== await hashPin(id, pin)) {
+      authMsg.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
+      document.getElementById('liPin').value = '';
+      return false;
+    }
+    localStorage.setItem('tb_lastUser',
+      document.getElementById('rememberChk').checked ? id : '');
+    finishLogin(id);
+    return true;
+  }
+
+  document.getElementById('liBtn').addEventListener('click', tryLogin);
+  // 4자리를 다 입력하면 자동 로그인 시도
+  document.getElementById('liPin').addEventListener('input', e => {
+    if (e.target.value.length === 4) tryLogin();
+  });
+  [['suPin2', 'suBtn'], ['liPin', 'liBtn']].forEach(([inp, btn]) => {
+    document.getElementById(inp).addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById(btn).click();
+    });
+  });
+  document.getElementById('goLogin').addEventListener('click', () => showAuthForm('login'));
+  document.getElementById('goSignup').addEventListener('click', () => showAuthForm('signup'));
+
+  // 시작: 동기화 → 로그인 → 이번 달 달력
   (async () => {
     if (window.electronAPI && window.electronAPI.syncLoad) await syncInit();
+    await authInit();
     const t = new Date();
     renderCalendar(t.getFullYear(), t.getMonth());
   })();

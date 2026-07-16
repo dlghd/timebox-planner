@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   chooseSyncFolder: () => ipcRenderer.invoke('choose-sync-folder'),
   syncLoad: () => ipcRenderer.invoke('sync-load'),
   syncSave: payload => ipcRenderer.send('sync-save', payload),
+  openMemo: payload => ipcRenderer.send('open-memo', payload),
 });

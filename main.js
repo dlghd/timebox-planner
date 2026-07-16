@@ -1,13 +1,15 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let win;
 
 function createWindow() {
+  // D(데일리 플래너) 화면 폭에 맞추고, 세로는 화면 작업영역 최대로
+  const wa = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: 860,
-    height: 780,
+    width: Math.min(850, wa.width),
+    height: wa.height,
     minWidth: 420,
     minHeight: 480,
     alwaysOnTop: true,
@@ -72,6 +74,36 @@ ipcMain.on('sync-save', (e, payload) => {
   const f = dataFilePath();
   if (!f || !payload) return;
   try { fs.writeFileSync(f, JSON.stringify(payload)); } catch { /* 클라우드 폴더 일시 접근 불가 무시 */ }
+});
+
+// ── 메모 서브창 (트리플클릭) ──
+ipcMain.on('open-memo', (e, { title, html }) => {
+  const esc = s => String(s || '').replace(/</g, '&lt;');
+  const page = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+  body { font-family: "Malgun Gothic", "Segoe UI", sans-serif; padding: 16px 20px; margin: 0;
+         font-size: 14px; line-height: 1.7; word-break: break-all; color: #222; }
+  h3 { font-size: 13px; color: #888; font-weight: 600; margin: 0 0 10px;
+       padding-bottom: 8px; border-bottom: 1.5px solid #222; }
+</style></head><body><h3>${esc(title)}</h3><div>${html}</div></body></html>`;
+
+  const sub = new BrowserWindow({
+    width: 460,
+    height: 300,
+    parent: win,
+    alwaysOnTop: true,
+    autoHideMenuBar: true,
+    title: title,
+  });
+  sub.setMenuBarVisibility(false);
+  sub.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(page));
+  // 글자가 다 보이도록 내용 높이에 맞춰 창 크기 조절
+  sub.webContents.once('did-finish-load', () => {
+    sub.webContents.executeJavaScript('document.body.scrollHeight').then(h => {
+      const wa = screen.getPrimaryDisplay().workAreaSize;
+      sub.setContentSize(460, Math.min(Math.max(h + 24, 160), wa.height - 80));
+    }).catch(() => {});
+  });
 });
 
 app.on('window-all-closed', () => app.quit());
