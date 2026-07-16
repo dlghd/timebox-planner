@@ -38,7 +38,8 @@ export default {
       if (url.pathname === '/login' && req.method === 'POST') {
         const { id, pinHash } = await req.json();
         const acct = JSON.parse((await env.KV.get('acct:' + id)) || 'null');
-        if (!acct || acct.pinHash !== pinHash) return json({ error: 'auth' }, 401);
+        if (!acct) return json({ error: 'no-account' }, 404);
+        if (acct.pinHash !== pinHash) return json({ error: 'auth' }, 401);
         const token = crypto.randomUUID();
         await env.KV.put('tok:' + token, id);
         return json({ token, name: acct.name });

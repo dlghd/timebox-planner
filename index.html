@@ -1537,19 +1537,23 @@
     const pin = document.getElementById('pinChk');
     pin.addEventListener('change', () => window.electronAPI.setPin(pin.checked));
 
-    // 데이터 초기화: 모든 플래너/메모 기록 삭제
-    document.getElementById('resetBtn').addEventListener('click', () => {
+    // 데이터 초기화: 현재 계정의 기록 삭제 (서버 반영이 끝난 뒤 새로고침)
+    document.getElementById('resetBtn').addEventListener('click', async () => {
+      if (!curUser) return;
       if (!confirm('현재 계정의 모든 메모와 일정 기록을 완전히 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
       Object.keys(localStorage)
         .filter(k => k.startsWith(userPrefix()))
         .forEach(k => localStorage.removeItem(k));
-      scheduleSync(true);   // 동기화 파일에도 반영
+      localStorage.setItem('sync_at_' + curUser, String(Date.now()));
+      clearTimeout(syncTimer);
+      syncTimer = null;
+      await pushToServer();   // 빈 상태를 서버에 반영한 뒤 재시작
       location.reload();
     });
 
-    // 로그아웃 → 로그인 화면으로
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      scheduleSync(true);
+    // 로그아웃 → 로그인 화면으로 (마지막 변경분 서버 저장 후)
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; await pushToServer(); }
       location.reload();
     });
 
@@ -1655,6 +1659,24 @@
         return true;
       }
       authMsg.textContent = '서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.';
+      return false;
+    }
+    if (r.status === 404) {
+      // 서버에 없는 아이디: 구버전(로컬 계정)에서 만든 계정이면 자동으로 서버에 이전
+      const cached = getAccounts()[id];
+      if (cached && cached.pin === pinHash) {
+        const reg = await api('/register', { method: 'POST', body: { id, name: cached.name || id, pinHash } })
+          .catch(() => null);
+        if (reg && reg.ok) {
+          localStorage.setItem('tb_token_' + id, reg.data.token);
+          localStorage.setItem('tb_lastUser',
+            document.getElementById('rememberChk').checked ? id : '');
+          finishLogin(id);
+          scheduleSync(true);   // 이 PC의 기존 기록을 서버로 올림
+          return true;
+        }
+      }
+      authMsg.textContent = '등록되지 않은 아이디입니다. "새 계정 만들기"로 가입해주세요.';
       return false;
     }
     if (!r.ok) {
