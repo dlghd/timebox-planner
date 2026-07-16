@@ -1026,47 +1026,99 @@
   }
 
   // ── 클라우드 폴더 동기화 (데스크톱 앱 전용) ──
+  // 파일 형식 v2: 사용자별 데이터 + 계정 정보를 함께 저장 → 다른 PC에서 폴더만 지정하면
+  // 같은 아이디/비밀번호로 바로 로그인하고 기록을 불러올 수 있음
   let syncTimer = null;
 
-  function exportAll() {
-    const data = {};
+  // 키에서 사용자 아이디 추출 (u_{id}_timebox_... / u_{id}_memo_...)
+  function keyUser(k) {
+    if (!k.startsWith('u_')) return null;
+    for (const tag of ['_timebox_', '_memo_']) {
+      const i = k.indexOf(tag);
+      if (i > 1) return k.slice(2, i);
+    }
+    return null;
+  }
+
+  function buildPayload() {
+    const users = {};
     Object.keys(localStorage).forEach(k => {
-      if (isDataKey(k)) data[k] = localStorage.getItem(k);
+      const id = keyUser(k);
+      if (!id) return;
+      if (!users[id]) users[id] = { savedAt: +(localStorage.getItem('sync_at_' + id) || 0), data: {} };
+      users[id].data[k] = localStorage.getItem(k);
     });
-    return data;
+    // 데이터를 모두 지운 사용자도 삭제 시각을 유지 (삭제가 다른 PC에 전파되도록)
+    Object.keys(localStorage).forEach(k => {
+      if (!k.startsWith('sync_at_')) return;
+      const id = k.slice(8);
+      if (!users[id]) users[id] = { savedAt: +(localStorage.getItem(k) || 0), data: {} };
+    });
+    return { format: 2, users, accounts: getAccounts(), savedAt: Date.now() };
   }
 
   function scheduleSync(immediate) {
     if (!window.electronAPI || !window.electronAPI.syncSave) return;
-    localStorage.setItem('sync_savedAt', String(Date.now()));
-    const payload = () => ({ savedAt: +(localStorage.getItem('sync_savedAt') || 0), data: exportAll() });
+    if (curUser) localStorage.setItem('sync_at_' + curUser, String(Date.now()));
     clearTimeout(syncTimer);
     syncTimer = null;
-    if (immediate) { window.electronAPI.syncSave(payload()); return; }
-    syncTimer = setTimeout(() => { syncTimer = null; window.electronAPI.syncSave(payload()); }, 800);
+    if (immediate) { window.electronAPI.syncSave(buildPayload()); return; }
+    syncTimer = setTimeout(() => { syncTimer = null; window.electronAPI.syncSave(buildPayload()); }, 800);
   }
 
   window.addEventListener('beforeunload', () => {
     if (syncTimer) scheduleSync(true);   // 닫기 전 마지막 변경 즉시 저장
   });
 
-  // 앱 시작 시: 동기화 파일과 로컬 중 더 최신 쪽으로 맞춤
+  // 구버전 파일({savedAt, data}) → v2 형식으로 변환
+  function normalizeSync(file) {
+    if (!file) return { users: {}, accounts: {} };
+    if (file.format === 2) return { users: file.users || {}, accounts: file.accounts || {} };
+    const users = {};
+    Object.entries(file.data || {}).forEach(([k, v]) => {
+      const id = keyUser(k);
+      if (!id) return;
+      if (!users[id]) users[id] = { savedAt: file.savedAt || 0, data: {} };
+      users[id].data[k] = v;
+    });
+    return { users, accounts: {} };
+  }
+
+  // 앱 시작/폴더 지정 시: 파일과 로컬을 사용자 단위로 병합 (각 사용자는 더 최신 쪽 우선)
   async function syncInit() {
     try {
       const res = await window.electronAPI.syncLoad();
       if (!res || !res.ok) return;
-      const localAt = +(localStorage.getItem('sync_savedAt') || 0);
-      if ((res.savedAt || 0) > localAt) {
-        Object.keys(localStorage)
-          .filter(isDataKey)
-          .forEach(k => localStorage.removeItem(k));
-        Object.entries(res.data || {}).forEach(([k, v]) => {
-          if (isDataKey(k)) localStorage.setItem(k, v);
-        });
-        localStorage.setItem('sync_savedAt', String(res.savedAt));
-      } else if (localAt > (res.savedAt || 0)) {
-        scheduleSync(true);
-      }
+      const f = normalizeSync(res.file);
+      let fileStale = false;   // 로컬에 파일보다 새로운 내용이 있으면 파일 갱신
+
+      // 계정 병합: 파일에만 있는 계정을 이 PC에 추가 → 다른 PC에서 만든 아이디로 로그인 가능
+      const accts = getAccounts();
+      let acctsChanged = false;
+      Object.entries(f.accounts).forEach(([id, a]) => {
+        if (!accts[id]) { accts[id] = a; acctsChanged = true; }
+      });
+      if (acctsChanged) localStorage.setItem('tb_accounts', JSON.stringify(accts));
+      if (Object.keys(accts).some(id => !f.accounts[id])) fileStale = true;
+
+      // 사용자별 데이터 병합
+      Object.entries(f.users).forEach(([id, u]) => {
+        const localAt = +(localStorage.getItem('sync_at_' + id) || 0);
+        if ((u.savedAt || 0) > localAt) {
+          Object.keys(localStorage).filter(k => keyUser(k) === id)
+            .forEach(k => localStorage.removeItem(k));
+          Object.entries(u.data || {}).forEach(([k, v]) => localStorage.setItem(k, v));
+          localStorage.setItem('sync_at_' + id, String(u.savedAt || 0));
+        } else if (localAt > (u.savedAt || 0)) {
+          fileStale = true;
+        }
+      });
+
+      // 파일에 없는 로컬 사용자가 있으면 파일 갱신
+      const localIds = new Set(Object.keys(localStorage).map(keyUser).filter(Boolean));
+      localIds.forEach(id => { if (!f.users[id]) fileStale = true; });
+
+      if (fileStale) window.electronAPI.syncSave(buildPayload());
     } catch (e) { /* 동기화 실패는 무시 (로컬 데이터로 계속) */ }
   }
 
@@ -1528,7 +1580,8 @@
       await syncInit();        // 폴더에 기존 기록이 있으면 최신 쪽으로 병합
       scheduleSync(true);
       alert('동기화 폴더가 설정되었습니다:\n' + r.folder +
-            '\n\n노트북 등 다른 PC에서도 [동기화] 버튼으로 같은 클라우드 폴더를 지정하면 기록이 공유됩니다.');
+            '\n\n노트북 등 다른 PC에서도 [동기화] 버튼으로 같은 클라우드 폴더를 지정하면\n' +
+            '계정과 기록이 함께 공유되어, 같은 아이디/비밀번호로 바로 로그인할 수 있습니다.');
       location.reload();
     });
   }

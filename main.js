@@ -64,7 +64,7 @@ ipcMain.handle('sync-load', () => {
   if (!f) return { ok: false, reason: 'no-folder' };
   try {
     const j = JSON.parse(fs.readFileSync(f, 'utf8'));
-    return { ok: true, savedAt: j.savedAt || 0, data: j.data || {}, folder: path.dirname(f) };
+    return { ok: true, file: j, folder: path.dirname(f) };
   } catch {
     return { ok: false, reason: 'no-file', folder: path.dirname(f) };
   }
