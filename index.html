@@ -355,6 +355,17 @@
   }
   #appBar #resetBtn:hover { background: #c33; color: #fff; }
 
+  #appBar #syncBtn {
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    background: #fff;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  #appBar #syncBtn:hover { background: var(--ink); color: #fff; }
+
   .body-grid {
     display: grid;
     grid-template-columns: 250px 1fr;
@@ -504,17 +515,9 @@
   .tl-now {
     position: absolute;
     left: 44px; right: 0;
-    border-top: 2px solid #e05d5d;
+    border-top: 2px dashed #e05d5d;
     pointer-events: none;
     z-index: 5;
-  }
-  .tl-now::before {
-    content: '';
-    position: absolute;
-    left: -5px; top: -5px;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #e05d5d;
   }
 
   /* 일정 블록 */
@@ -601,6 +604,7 @@
   <span>불투명도</span>
   <input type="range" id="opacityRange" min="30" max="100" value="100" title="창 불투명도 조절">
   <label title="다른 창 위에 항상 표시"><input type="checkbox" id="pinChk" checked> 항상 위</label>
+  <button id="syncBtn" title="클라우드 폴더(OneDrive/구글드라이브 등)를 지정하면 다른 PC와 기록이 공유됩니다">동기화</button>
   <button id="resetBtn" title="모든 메모/일정 기록을 완전히 삭제">초기화</button>
 </div>
 <div class="page">
@@ -797,6 +801,7 @@
         memo.value = localStorage.getItem(memoStore(k)) || '';
         memo.addEventListener('input', () => {
           localStorage.setItem(memoStore(k), memo.value);
+          scheduleSync();
         });
         td.appendChild(memo);
 
@@ -893,6 +898,52 @@
   function savePlanner() {
     saved.events = events;
     localStorage.setItem(plannerStore(currentKey), JSON.stringify(saved));
+    scheduleSync();
+  }
+
+  // ── 클라우드 폴더 동기화 (데스크톱 앱 전용) ──
+  let syncTimer = null;
+
+  function exportAll() {
+    const data = {};
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('timebox_') || k.startsWith('memo_')) data[k] = localStorage.getItem(k);
+    });
+    return data;
+  }
+
+  function scheduleSync(immediate) {
+    if (!window.electronAPI || !window.electronAPI.syncSave) return;
+    localStorage.setItem('sync_savedAt', String(Date.now()));
+    const payload = () => ({ savedAt: +(localStorage.getItem('sync_savedAt') || 0), data: exportAll() });
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    if (immediate) { window.electronAPI.syncSave(payload()); return; }
+    syncTimer = setTimeout(() => { syncTimer = null; window.electronAPI.syncSave(payload()); }, 800);
+  }
+
+  window.addEventListener('beforeunload', () => {
+    if (syncTimer) scheduleSync(true);   // 닫기 전 마지막 변경 즉시 저장
+  });
+
+  // 앱 시작 시: 동기화 파일과 로컬 중 더 최신 쪽으로 맞춤
+  async function syncInit() {
+    try {
+      const res = await window.electronAPI.syncLoad();
+      if (!res || !res.ok) return;
+      const localAt = +(localStorage.getItem('sync_savedAt') || 0);
+      if ((res.savedAt || 0) > localAt) {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('timebox_') || k.startsWith('memo_'))
+          .forEach(k => localStorage.removeItem(k));
+        Object.entries(res.data || {}).forEach(([k, v]) => {
+          if (k.startsWith('timebox_') || k.startsWith('memo_')) localStorage.setItem(k, v);
+        });
+        localStorage.setItem('sync_savedAt', String(res.savedAt));
+      } else if (localAt > (res.savedAt || 0)) {
+        scheduleSync(true);
+      }
+    } catch (e) { /* 동기화 실패는 무시 (로컬 데이터로 계속) */ }
   }
 
   // ── 일정 블록 렌더링 ──
@@ -1320,13 +1371,28 @@
       Object.keys(localStorage)
         .filter(k => k.startsWith('timebox_') || k.startsWith('memo_'))
         .forEach(k => localStorage.removeItem(k));
+      scheduleSync(true);   // 동기화 파일도 비움
+      location.reload();
+    });
+
+    // 동기화 폴더 지정 (OneDrive/구글드라이브 등)
+    document.getElementById('syncBtn').addEventListener('click', async () => {
+      const r = await window.electronAPI.chooseSyncFolder();
+      if (!r || !r.ok) return;
+      await syncInit();        // 폴더에 기존 기록이 있으면 최신 쪽으로 병합
+      scheduleSync(true);
+      alert('동기화 폴더가 설정되었습니다:\n' + r.folder +
+            '\n\n노트북 등 다른 PC에서도 [동기화] 버튼으로 같은 클라우드 폴더를 지정하면 기록이 공유됩니다.');
       location.reload();
     });
   }
 
-  // 시작: 이번 달 달력
-  const t = new Date();
-  renderCalendar(t.getFullYear(), t.getMonth());
+  // 시작: 동기화 데이터 반영 후 이번 달 달력 표시
+  (async () => {
+    if (window.electronAPI && window.electronAPI.syncLoad) await syncInit();
+    const t = new Date();
+    renderCalendar(t.getFullYear(), t.getMonth());
+  })();
 </script>
 </body>
 </html>
