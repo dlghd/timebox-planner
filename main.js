@@ -35,12 +35,49 @@ ipcMain.on('set-pin', (e, on) => {
   if (win) win.setAlwaysOnTop(!!on);
 });
 
-// 일정 시작 시스템 알림 (다른 창을 보고 있어도 표시)
+// 일정 시작 알림 — 포커스를 뺏지 않고(작업 방해 X) 항상 맨 앞에 뜨는 팝업
+let alarmWin = null;
 ipcMain.on('notify', (e, { title, body }) => {
-  if (!Notification.isSupported()) return;
-  try {
-    new Notification({ title: String(title || '타임박스'), body: String(body || '') }).show();
-  } catch (err) { /* 알림 실패 무시 */ }
+  const esc = s => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  const wa = screen.getPrimaryDisplay().workAreaSize;
+  const W = 340, H = 100;
+
+  if (alarmWin && !alarmWin.isDestroyed()) { alarmWin.close(); alarmWin = null; }
+  alarmWin = new BrowserWindow({
+    width: W, height: H,
+    x: wa.width - W - 18,
+    y: wa.height - H - 18,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    focusable: false,      // 포커스를 가져가지 않아 하던 작업을 방해하지 않음
+    hasShadow: false,
+    show: false,
+  });
+  alarmWin.setAlwaysOnTop(true, 'screen-saver');   // 다른 창·전체화면 위에도 표시
+
+  const html = `<!doctype html><meta charset="utf-8"><style>
+    html,body{margin:0;height:100%;background:transparent;overflow:hidden;font-family:'Malgun Gothic',sans-serif}
+    .card{margin:8px;height:calc(100% - 16px);background:#222;border-radius:13px;color:#fff;
+      display:flex;align-items:center;gap:13px;padding:0 17px;box-shadow:0 8px 26px rgba(0,0,0,.45);
+      border-left:6px solid #e05d5d;animation:pop .4s cubic-bezier(.2,1.35,.45,1)}
+    @keyframes pop{from{transform:translateY(34px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+    .ic{font-size:27px;animation:sh .6s ease 2}
+    @keyframes sh{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
+    .tx{flex:1;min-width:0}
+    .t{font-size:12px;color:#ff9a9a;font-weight:700;margin-bottom:3px}
+    .b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  </style><div class="card"><div class="ic">⏰</div><div class="tx">
+    <div class="t">${esc(title)}</div><div class="b">${esc(body)}</div></div></div>`;
+
+  alarmWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  alarmWin.showInactive();   // 포커스 없이 표시
+  setTimeout(() => {
+    if (alarmWin && !alarmWin.isDestroyed()) { alarmWin.close(); alarmWin = null; }
+  }, 5000);
 });
 
 // ── 클라우드 폴더 동기화 ──

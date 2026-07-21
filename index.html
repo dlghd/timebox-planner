@@ -701,26 +701,32 @@
     position: fixed;
     left: 50%;
     bottom: 26px;
-    transform: translateX(-50%) translateY(24px);
-    background: rgba(34, 34, 34, .96);
+    transform: translateX(-50%) translateY(28px) scale(.97);
+    background: rgba(28, 28, 28, .97);
     color: #fff;
-    padding: 13px 20px;
-    border-radius: 10px;
+    padding: 14px 22px;
+    border-radius: 12px;
+    border-left: 6px solid #e05d5d;
     font-size: 14px;
     line-height: 1.4;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+    box-shadow: 0 8px 26px rgba(0, 0, 0, .45);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .3s ease, transform .3s ease;
+    transition: opacity .3s ease, transform .4s cubic-bezier(.2,1.35,.45,1);
     z-index: 99999;
     max-width: 88%;
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 11px;
   }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  #toast .toast-ic { font-size: 17px; }
-  #toast b { font-weight: 700; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  #toast .toast-ic { font-size: 20px; animation: toast-shake .6s ease 2; }
+  @keyframes toast-shake {
+    0%,100% { transform: rotate(0); }
+    25% { transform: rotate(-14deg); }
+    75% { transform: rotate(14deg); }
+  }
+  #toast b { font-weight: 700; color: #ff9a9a; }
 
   /* ══════════ 모바일 (휴대폰) ══════════ */
   @media (max-width: 720px) {
@@ -1865,8 +1871,14 @@
         notified.add(k);
         const label = stripHtml(ev.text) || '일정';
         const timeStr = `${Math.floor(ev.s / 60)}:${pad(ev.s % 60)}`;
-        showToast(`<b>${timeStr}</b> · ${label} 시작할 시간입니다`);
-        systemNotify('타임박스 일정', `${timeStr}  ${label}`);
+        if (window.electronAPI && window.electronAPI.notify) {
+          // 데스크톱: 포커스를 뺏지 않고 항상 맨 앞에 뜨는 알림 팝업
+          window.electronAPI.notify({ title: '타임박스 일정', body: `${timeStr}  ${label} 시작` });
+        } else {
+          // 웹/휴대폰: 하단 토스트 + (권한 허용 시) 시스템 알림
+          showToast(`<b>${timeStr}</b> · ${label} 시작할 시간입니다`);
+          systemNotify('타임박스 일정', `${timeStr}  ${label}`);
+        }
       }
     });
   }
