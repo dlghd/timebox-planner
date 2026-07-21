@@ -8,7 +8,16 @@
 <meta name="theme-color" content="#3d3d3d">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Timebox">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
+<script>
+  // 서비스워커 등록 (휴대폰 웹앱 설치 + 오프라인 실행). file:// (데스크톱 앱)에서는 건너뜀
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
