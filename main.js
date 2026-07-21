@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, screen, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -33,6 +33,14 @@ ipcMain.on('set-opacity', (e, v) => {
 
 ipcMain.on('set-pin', (e, on) => {
   if (win) win.setAlwaysOnTop(!!on);
+});
+
+// 일정 시작 시스템 알림 (다른 창을 보고 있어도 표시)
+ipcMain.on('notify', (e, { title, body }) => {
+  if (!Notification.isSupported()) return;
+  try {
+    new Notification({ title: String(title || '타임박스'), body: String(body || '') }).show();
+  } catch (err) { /* 알림 실패 무시 */ }
 });
 
 // ── 클라우드 폴더 동기화 ──

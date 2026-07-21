@@ -696,6 +696,32 @@
     line-height: 1.6;
   }
 
+  /* ── 하단 알림 토스트 ── */
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%) translateY(24px);
+    background: rgba(34, 34, 34, .96);
+    color: #fff;
+    padding: 13px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease, transform .3s ease;
+    z-index: 99999;
+    max-width: 88%;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast .toast-ic { font-size: 17px; }
+  #toast b { font-weight: 700; }
+
   /* ══════════ 모바일 (휴대폰) ══════════ */
   @media (max-width: 720px) {
     body { padding: 6px 4px; }
@@ -728,6 +754,7 @@
 </style>
 </head>
 <body spellcheck="false">
+<div id="toast"></div>
 <div id="appBar" class="hidden">
   <span>불투명도</span>
   <input type="range" id="opacityRange" min="30" max="100" value="100" title="창 불투명도 조절">
@@ -1787,9 +1814,72 @@
   document.getElementById('goLogin').addEventListener('click', () => showAuthForm('login'));
   document.getElementById('goSignup').addEventListener('click', () => showAuthForm('signup'));
 
+  // ══════════ 일정 시작 알림 ══════════
+  let toastTimer = null;
+  function showToast(html) {
+    const t = document.getElementById('toast');
+    t.innerHTML = '<span class="toast-ic">⏰</span><span>' + html + '</span>';
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3000);   // 3초 유지
+  }
+
+  function stripHtml(s) {
+    const d = document.createElement('div');
+    d.innerHTML = s || '';
+    return (d.textContent || '').trim();
+  }
+
+  function systemNotify(title, body) {
+    // 데스크톱 앱: 다른 창을 보고 있어도 뜨는 시스템 알림
+    if (window.electronAPI && window.electronAPI.notify) {
+      window.electronAPI.notify({ title, body });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification(title, { body, icon: 'icon-192.png' }); } catch (e) {}
+    }
+  }
+
+  const notified = new Set();
+  const alarmKey = (dk, ev) => `${dk}_${ev.s}_${stripHtml(ev.text)}`;
+
+  // 이미 지난 일정은 울리지 않도록 등록 (미래 일정만 알림)
+  function primeNotified() {
+    const now = new Date();
+    const dk = keyOf(now);
+    const curMin = now.getHours() * 60 + now.getMinutes();
+    const data = loadPlanner(dk);
+    (Array.isArray(data.events) ? data.events : []).forEach(ev => {
+      if (ev.s <= curMin) notified.add(alarmKey(dk, ev));
+    });
+  }
+
+  function checkAlarms() {
+    if (!curUser) return;
+    const now = new Date();
+    const dk = keyOf(now);
+    const curMin = now.getHours() * 60 + now.getMinutes();
+    const data = loadPlanner(dk);
+    (Array.isArray(data.events) ? data.events : []).forEach(ev => {
+      const k = alarmKey(dk, ev);
+      if (ev.s === curMin && !notified.has(k)) {
+        notified.add(k);
+        const label = stripHtml(ev.text) || '일정';
+        const timeStr = `${Math.floor(ev.s / 60)}:${pad(ev.s % 60)}`;
+        showToast(`<b>${timeStr}</b> · ${label} 시작할 시간입니다`);
+        systemNotify('타임박스 일정', `${timeStr}  ${label}`);
+      }
+    });
+  }
+  setInterval(checkAlarms, 10000);   // 10초마다 확인
+
   // 시작: 로그인 → 이번 달 달력 (기록은 로그인 시 서버에서 자동 로딩)
   (async () => {
     await authInit();
+    primeNotified();
+    // 웹(브라우저/휴대폰): 알림 권한 요청 (허용 시 화면 밖에서도 알림)
+    if (!window.electronAPI && 'Notification' in window && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch (e) {}
+    }
     const t = new Date();
     renderCalendar(t.getFullYear(), t.getMonth());
   })();
