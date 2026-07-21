@@ -696,6 +696,78 @@
     line-height: 1.6;
   }
 
+  /* ── 메모 상세 편집 모달 (트리플클릭) ── */
+  #memoModal {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: rgba(0, 0, 0, .45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #memoModal.hidden { display: none !important; }
+
+  .memo-box {
+    background: #fff;
+    width: 500px;
+    max-width: 100%;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    box-shadow: 0 14px 44px rgba(0, 0, 0, .45);
+    overflow: hidden;
+  }
+
+  .memo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--header-bg);
+    color: #fff;
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .memo-head button {
+    border: none;
+    background: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 2px;
+  }
+
+  .memo-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    background: #fafafa;
+    flex-shrink: 0;
+  }
+
+  #memoEdit {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    font-size: 15px;
+    line-height: 1.75;
+    word-break: break-all;
+    outline: none;
+    min-height: 140px;
+  }
+  #memoEdit:empty::before {
+    content: '내용을 입력하세요';
+    color: #ccc;
+  }
+
   /* ── 하단 알림 토스트 ── */
   #toast {
     position: fixed;
@@ -761,6 +833,33 @@
 </head>
 <body spellcheck="false">
 <div id="toast"></div>
+
+<div id="memoModal" class="hidden">
+  <div class="memo-box">
+    <div class="memo-head">
+      <span id="memoTitle"></span>
+      <button id="memoClose" title="닫기 (Esc)">&times;</button>
+    </div>
+    <div class="memo-tools">
+      <button class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)">B</button>
+      <button class="fmt-btn u" data-cmd="underline" title="밑줄 (Ctrl+U)">U</button>
+      <button class="fmt-btn i" data-cmd="italic" title="기울임 (Ctrl+I)">I</button>
+      <button class="fmt-btn s" data-cmd="strikeThrough" title="취소선">S</button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-btn sz" data-size="1" title="작게" style="font-size:10px">가</button>
+      <button class="fmt-btn sz" data-size="3" title="보통" style="font-size:13px">가</button>
+      <button class="fmt-btn sz" data-size="5" title="크게" style="font-size:17px">가</button>
+      <span class="fmt-sep"></span>
+      <button class="fmt-hl" data-color="#fff176" style="background:#fff176" title="형광펜 노랑"></button>
+      <button class="fmt-hl" data-color="#b9f6ca" style="background:#b9f6ca" title="형광펜 초록"></button>
+      <button class="fmt-hl" data-color="#f8bbd0" style="background:#f8bbd0" title="형광펜 분홍"></button>
+      <button class="fmt-hl" data-color="#b3e5fc" style="background:#b3e5fc" title="형광펜 파랑"></button>
+      <button class="fmt-hl" data-color="#ff8a80" style="background:#ff8a80" title="형광펜 빨강"></button>
+      <button class="fmt-hl none" data-color="" title="형광펜 지우기">&#8709;</button>
+    </div>
+    <div id="memoEdit" class="edit" contenteditable="true"></div>
+  </div>
+</div>
 <div id="appBar" class="hidden">
   <span>불투명도</span>
   <input type="range" id="opacityRange" min="30" max="100" value="100" title="창 불투명도 조절">
@@ -1252,20 +1351,11 @@
         beginEdit(el, e);
       });
 
-      // 트리플클릭 = 메모 전체 내용을 서브창으로 크게 보기
+      // 트리플클릭 = 메모 전체 내용을 큰 창에서 편집
       el.addEventListener('click', e => {
         if (e.detail !== 3) return;
         if (e.target.closest('.chk, .ev-del, .ev-handle')) return;
-        const fmt = min => `${Math.floor(min / 60)}:${pad(min % 60)}`;
-        const title = `${currentKey}  ${fmt(ev.s)} ~ ${fmt(ev.s + ev.d)}`;
-        if (window.electronAPI && window.electronAPI.openMemo) {
-          window.electronAPI.openMemo({ title, html: ev.text || '(내용 없음)' });
-        } else {
-          const w = window.open('', '_blank', 'width=460,height=420');
-          w.document.write(`<meta charset="utf-8"><title>${title}</title>
-            <body style="font-family:'Malgun Gothic',sans-serif;padding:18px;font-size:14px;line-height:1.7;word-break:break-all">
-            <h3 style="margin-bottom:12px">${title}</h3>${ev.text || '(내용 없음)'}</body>`);
-        }
+        openMemoModal(ev);
       });
 
       // 커서 안내: 위 모서리 = 크기 조절, 가운데 = 이동
@@ -1397,6 +1487,7 @@
     const a = document.activeElement;
     const editing = a && (['INPUT', 'TEXTAREA'].includes(a.tagName) || a.isContentEditable);
     if (e.key === 'Escape') {
+      if (!memoModal.classList.contains('hidden')) { closeMemoModal(); return; }
       selected = null;
       renderEvents();
       miniCal.classList.add('hidden');
@@ -1819,6 +1910,45 @@
   });
   document.getElementById('goLogin').addEventListener('click', () => showAuthForm('login'));
   document.getElementById('goSignup').addEventListener('click', () => showAuthForm('signup'));
+
+  // ══════════ 메모 상세 편집 모달 (트리플클릭) ══════════
+  const memoModal = document.getElementById('memoModal');
+  const memoEdit = document.getElementById('memoEdit');
+  let memoEv = null;
+
+  function openMemoModal(ev) {
+    memoEv = ev;
+    const fmt = min => `${Math.floor(min / 60)}:${pad(min % 60)}`;
+    document.getElementById('memoTitle').textContent =
+      `${currentKey}  ${fmt(ev.s)} ~ ${fmt(ev.s + ev.d)}`;
+    memoEdit.innerHTML = ev.text || '';
+    memoModal.classList.remove('hidden');
+    memoEdit.focus();
+    // 커서를 내용 끝으로
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(memoEdit);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function closeMemoModal() {
+    if (memoModal.classList.contains('hidden')) return;
+    memoModal.classList.add('hidden');
+    memoEv = null;
+    renderEvents();   // 타임박스 블록에 수정 내용 반영
+  }
+
+  // 편집 → 즉시 저장 (블록/서버 반영)
+  memoEdit.addEventListener('input', () => {
+    if (!memoEv) return;
+    memoEv.text = cleanHtml(memoEdit);
+    savePlanner();
+  });
+
+  document.getElementById('memoClose').addEventListener('click', closeMemoModal);
+  memoModal.addEventListener('mousedown', e => { if (e.target === memoModal) closeMemoModal(); });
 
   // ══════════ 일정 시작 알림 ══════════
   let toastTimer = null;
